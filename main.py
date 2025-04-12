@@ -154,7 +154,7 @@ symbol_precisions = get_symbol_precisions()
 def get_usdt_pairs():
     return list(symbol_precisions.keys())
 
-def get_klines(symbol, interval, limit=100):
+def get_klines(symbol, interval, limit=210):
     klines = client.klines(symbol=symbol, interval=interval, limit=limit)
     df = pd.DataFrame(klines, columns=['timestamp', 'o', 'h', 'l', 'c', 'v', 'close_time', 'quote_asset_volume', 'num_trades', 'taker_buy_base_vol', 'taker_buy_quote_vol', 'ignore'])
     df['c'] = df['c'].astype(float)
@@ -208,7 +208,7 @@ def get_signal(df):
                 print(f"    [SKIP] Direction valid but not aligned with EMA200 trend")
         else:
             print(f"    [FAIL] {notes} not satisfied")
-        time.sleep(60)
+        time.sleep(1)
 
     return None, None
 
@@ -264,28 +264,13 @@ def place_trade(symbol, signal, entry_price, notes):
     )
     send_telegram_message(msg)
 
-def send_report():
-    df = pd.DataFrame(trade_log, columns=[
-        "Trade Number", "Pair", "Long/Short", "Entry Price", "Stop Loss", "Take Profit",
-        "Position Size", "RR Ratio", "Notes"])
-    df.to_csv(REPORT_FILENAME, index=False)
-    print(f"[REPORT] Saved to {REPORT_FILENAME}")
-
 
 # ==== MAIN LOOP ====
 while True:
     try:
-        now = time.strftime('%Y-%m-%d')
-        if now != current_day:
-            send_report()
-            trade_log = []
-            trades_today = 0
-            current_day = now
-            print(f"[RESET] New day: {current_day}, trades reset.")
 
         if trades_today >= MAX_TRADES_PER_DAY:
             print("[END] Max trades reached today. Exiting bot.")
-            send_report()
             break
 
         found_signal = False
@@ -317,11 +302,6 @@ while True:
 
     print("[SLEEP] Waiting 5 minutes before next scan...")
     
-print("[END] Bot stopped, sending report...")
-if trade_log: 
-    send_report()
-else:
-    print("[REPORT] No trades executed today.")
 print("[END] Bot execution completed.")
 send_telegram_message("Bot execution completed.")
 
