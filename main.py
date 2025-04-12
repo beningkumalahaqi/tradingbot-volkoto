@@ -112,7 +112,7 @@ def get_yesterday_pnl(api_key, api_secret, testnet=True):
 # ==== CONFIG ====
 API_KEY = os.getenv("API_KEY") # Fill this in
 API_SECRET = os.getenv("API_SECRET")  # Fill this in
-TESTNET = True  # Set to False for live trading
+TESTNET = os.getenv("TESTNET", 'False').lower() in ('true', '1', 't')
 INTERVAL = '5m'
 QUANTITY_USDT = 1.0  # Capital per trade
 RISK_PER_TRADE = 0.5  # SL = $0.5
