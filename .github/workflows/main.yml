@@ -28,6 +28,7 @@ jobs:
         API_SECRET: ${{ secrets.API_SECRET }}
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        TESTNET: ${{ secrets.TESTNET }}
 
     - name: Send Telegram notification on success
       if: success()
