@@ -1,0 +1,46 @@
+name: Run Python Script on Schedule
+
+on:
+  schedule:
+    - cron: '0 14 * * *'  # Every day at 21:00 WIB (14:00 UTC)
+  workflow_dispatch:       # Optional: allows manual trigger
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+
+    - name: Run script
+      run: python main.py
+      env:
+        API_KEY: ${{ secrets.API_KEY }} 
+        API_SECRET: ${{ secrets.API_SECRET }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+    - name: Send Telegram notification on success
+      if: success()
+      run: |
+        curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+        -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+        -d text="✅ *Binance Bot* ran successfully at $(date +'%H:%M:%S') WIB 🎯🚀\n\nEverything looks good!" \
+        -d parse_mode=Markdown
+
+    - name: Send Telegram notification on failure
+      if: failure()
+      run: |
+        curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+        -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+        -d text="❌ *Binance Bot* failed to run at $(date +'%H:%M:%S') WIB 💥🛑\n\nPlease check the GitHub Actions logs for more info." \
+        -d parse_mode=Markdown
