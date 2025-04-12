@@ -5,8 +5,9 @@ from binance.error import ClientError
 
 config_logging(logging, logging.DEBUG)
 
-key = '80e9f70fe0cbdea90c829ea5aedfea1658248715b468b150a83abcc829c99bf7' 
-secret = '34f7f107aefbea65fa504ae1306d028a81fd718620ecf0b5ec3522939d014f66' 
+# This is just a test, you can enter your own API key and secret Testnet
+key = '' 
+secret = '' 
 TESTNET = True  # Set to False for live trading
 
 BASE_URL = 'https://testnet.binancefuture.com' if TESTNET else 'https://fapi.binance.com'
