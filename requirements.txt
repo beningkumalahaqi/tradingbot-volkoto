@@ -2,3 +2,4 @@ pandas
 requests
 ta
 binance-futures-connector
+python-dotenv
