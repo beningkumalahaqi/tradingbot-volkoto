@@ -12,115 +12,130 @@ from ta.momentum import RSIIndicator
 from datetime import datetime, timedelta, timezone
 from binance.error import ClientError
 
+
 #load environment variables
 from dotenv import load_dotenv
 load_dotenv(override=True)
 
+
+# ==== External Function ====
 def send_telegram_message(text):
-    token = os.getenv('TELEGRAM_BOT_TOKEN')
-    chat_id = os.getenv('TELEGRAM_CHAT_ID')
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "HTML"
-    }
-    try:
-        response = requests.post(url, data=payload)
-        response.raise_for_status()
-    except Exception as e:
-        print(f"Telegram error: {e}")
+   token = os.getenv('TELEGRAM_BOT_TOKEN')
+   chat_id = os.getenv('TELEGRAM_CHAT_ID')
+   url = f"https://api.telegram.org/bot{token}/sendMessage"
+   payload = {
+       "chat_id": chat_id,
+       "text": text,
+       "parse_mode": "HTML"
+   }
+   try:
+       response = requests.post(url, data=payload)
+       response.raise_for_status()
+   except Exception as e:
+       print(f"Telegram error: {e}")
+
 
 def get_yesterday_pnl(api_key, api_secret, testnet=True):
-    # Logging setup
-    logging.basicConfig(level=logging.INFO, format='%(message)s')
+   # Logging setup
+   logging.basicConfig(level=logging.INFO, format='%(message)s')
 
-    # Use testnet or live URL
-    base_url = 'https://testnet.binancefuture.com' if testnet else 'https://fapi.binance.com'
-    
-    # Initialize client
-    um_futures_client = UMFutures(key=api_key, secret=api_secret, base_url=base_url)
 
-    # Set timezone to UTC+7
-    tz = timezone(timedelta(hours=7))
-    now_utc7 = datetime.now(tz)
+   # Use testnet or live URL
+   base_url = 'https://testnet.binancefuture.com' if testnet else 'https://fapi.binance.com'
+  
+   # Initialize client
+   um_futures_client = UMFutures(key=api_key, secret=api_secret, base_url=base_url)
 
-    # Calculate yesterday's time range
-    start_of_yesterday = datetime(now_utc7.year, now_utc7.month, now_utc7.day, tzinfo=tz) - timedelta(days=1)
-    start_ts = int(start_of_yesterday.timestamp() * 1000)
-    start_of_today = datetime(now_utc7.year, now_utc7.month, now_utc7.day, tzinfo=tz)
-    end_ts = int(start_of_today.timestamp() * 1000)
 
-    try:
-        response = um_futures_client.get_income_history(
-            incomeType='REALIZED_PNL',
-            startTime=start_ts,
-            endTime=end_ts,
-            recvWindow=6000
-        )
+   # Set timezone to UTC+7
+   tz = timezone(timedelta(hours=7))
+   now_utc7 = datetime.now(tz)
 
-        if response:
-            yesterday = (now_utc7 - timedelta(days=1)).strftime('%Y-%m-%d')
-            logging.info(f"== YESTERDAY'S REALIZED PNL - {yesterday} ==")
-            total_pnl = 0
-            trade_details = []
-            for entry in response:
-                income = float(entry['income'])
-                if income == 0:
-                    continue
 
-                symbol = entry['symbol']
-                time = datetime.fromtimestamp(entry['time'] / 1000).astimezone(tz).strftime('%Y-%m-%d %H:%M:%S')
-                status = "Profit" if income > 0 else "Loss"
-                total_pnl += income
+   # Calculate yesterday's time range
+   start_of_yesterday = datetime(now_utc7.year, now_utc7.month, now_utc7.day, tzinfo=tz) - timedelta(days=1)
+   start_ts = int(start_of_yesterday.timestamp() * 1000)
+   start_of_today = datetime(now_utc7.year, now_utc7.month, now_utc7.day, tzinfo=tz)
+   end_ts = int(start_of_today.timestamp() * 1000)
 
-                trade_details.append(f"[{time}] {symbol} | {status}: {income:.2f} USDT")
-                logging.info(f"[{time}] {symbol} | {status}: {income:.2f} USDT")
 
-            logging.info(f"\nTotal Realized PnL for Yesterday: {total_pnl:.2f} USDT")
-            
-            # Prepare the message for Telegram
-            # Prepare and send Telegram message
-            message_lines = [f"<b>📊 PNL - {yesterday}</b>"]
-            for entry in response:
-                income = float(entry['income'])
-                if income == 0:
-                    continue
-                symbol = entry['symbol']
-                hour_min = datetime.fromtimestamp(entry['time'] / 1000).astimezone(tz).strftime('%H:%M')
-                status = "Profit" if income > 0 else "Loss"
-                message_lines.append(f"[{hour_min}] <code>{symbol}</code> | {status}: <code>{income:.2f} USDT</code>")
-            message_lines.append(f"\n<b>Total:</b> <code>{total_pnl:.2f} USDT</code>")
-            message = "\n".join(message_lines)
+   try:
+       response = um_futures_client.get_income_history(
+           incomeType='REALIZED_PNL',
+           startTime=start_ts,
+           endTime=end_ts,
+           recvWindow=6000
+       )
 
-            send_telegram_message(message)
-            return total_pnl
-        else:
-            logging.info("No Realized PnL records found for yesterday.")
-            send_telegram_message("❌ No Realized PnL records found for yesterday.")
-            return 0
 
-    except ClientError as error:
-        logging.error(
-            f"Found error. status: {error.status_code}, "
-            f"error code: {error.error_code}, "
-            f"error message: {error.error_message}"
-        )
-        send_telegram_message(f"❌ Error fetching PnL data: {error.error_message}")
-        return None
+       if response:
+           yesterday = (now_utc7 - timedelta(days=1)).strftime('%Y-%m-%d')
+           logging.info(f"== YESTERDAY'S REALIZED PNL - {yesterday} ==")
+           total_pnl = 0
+           trade_details = []
+           for entry in response:
+               income = float(entry['income'])
+               if income == 0:
+                   continue
+
+
+               symbol = entry['symbol']
+               time = datetime.fromtimestamp(entry['time'] / 1000).astimezone(tz).strftime('%Y-%m-%d %H:%M:%S')
+               status = "Profit" if income > 0 else "Loss"
+               total_pnl += income
+
+
+               trade_details.append(f"[{time}] {symbol} | {status}: {income:.2f} USDT")
+               logging.info(f"[{time}] {symbol} | {status}: {income:.2f} USDT")
+
+
+           logging.info(f"\nTotal Realized PnL for Yesterday: {total_pnl:.2f} USDT")
+          
+           # Prepare the message for Telegram
+           # Prepare and send Telegram message
+           message_lines = [f"<b>📊 PNL - {yesterday}</b>"]
+           for entry in response:
+               income = float(entry['income'])
+               if income == 0:
+                   continue
+               symbol = entry['symbol']
+               hour_min = datetime.fromtimestamp(entry['time'] / 1000).astimezone(tz).strftime('%H:%M')
+               status = "Profit" if income > 0 else "Loss"
+               message_lines.append(f"[{hour_min}] <code>{symbol}</code> | {status}: <code>{income:.2f} USDT</code>")
+           message_lines.append(f"\n<b>Total:</b> <code>{total_pnl:.2f} USDT</code>")
+           message = "\n".join(message_lines)
+
+
+           send_telegram_message(message)
+           return total_pnl
+       else:
+           logging.info("No Realized PnL records found for yesterday.")
+           send_telegram_message("❌ No Realized PnL records found for yesterday.")
+           return 0
+
+
+   except ClientError as error:
+       logging.error(
+           f"Found error. status: {error.status_code}, "
+           f"error code: {error.error_code}, "
+           f"error message: {error.error_message}"
+       )
+       send_telegram_message(f"❌ Error fetching PnL data: {error.error_message}")
+       return None
+
 
 # ==== CONFIG ====
 API_KEY = os.getenv("API_KEY") # Fill this in
 API_SECRET = os.getenv("API_SECRET")  # Fill this in
 TESTNET = os.getenv("TESTNET", 'False').lower() in ('true', '1', 't')
 INTERVAL = '5m'
-QUANTITY_USDT = 1.0  # Capital per trade
-RISK_PER_TRADE = 0.5  # SL = $0.5
-TP_USDT = 1.0  # TP = $1
-LEVERAGE = 20
-MAX_TRADES_PER_DAY = 6
+QUANTITY_USDT = float(os.getenv("QUANTITY_USDT", 1))  # Convert to float
+RISK_PER_TRADE = float(os.getenv("RISK_PER_TRADE", 0.5))  # Convert to float
+TP_USDT = float(os.getenv("TP_USDT", 0.5))  # Convert to float
+LEVERAGE = float(os.getenv("LEVERAGE", 20))  # Convert to float
+MAX_TRADES_PER_DAY = int(os.getenv("MAX_TRADES_PER_DAY", 6))  # Convert to int
 TODAY = datetime.now().strftime('%Y-%m-%d')
-REPORT_FILENAME = 'Report/daily_report.csv - {}'.format(TODAY)
+
 
 # ==== INITIALIZE ====
 print(f"[START] Starting bot...")
@@ -133,43 +148,49 @@ trade_log = []
 send_telegram_message(f"Bot started on {current_day}. Monitoring market...")
 print(f"[START] Bot initialized successfully on {current_day}. Monitoring market...")
 
+
 # ==== FUNCTIONS ====
 def get_symbol_precisions():
-    info = client.exchange_info()
-    precisions = {}
-    for s in info['symbols']:
-        if s['contractType'] == 'PERPETUAL' and s['quoteAsset'] == 'USDT':
-            symbol = s['symbol']
-            qty_precision = None
-            for f in s['filters']:
-                if f['filterType'] == 'LOT_SIZE':
-                    step_size = float(f['stepSize'])
-                    qty_precision = abs(round(-1 * (len(str(step_size).split('.')[1].rstrip('0')))))
-                    break
-            precisions[symbol] = qty_precision
-    return precisions
+   info = client.exchange_info()
+   precisions = {}
+   for s in info['symbols']:
+       if s['contractType'] == 'PERPETUAL' and s['quoteAsset'] == 'USDT':
+           symbol = s['symbol']
+           qty_precision = None
+           for f in s['filters']:
+               if f['filterType'] == 'LOT_SIZE':
+                   step_size = float(f['stepSize'])
+                   qty_precision = abs(round(-1 * (len(str(step_size).split('.')[1].rstrip('0')))))
+                   break
+           precisions[symbol] = qty_precision
+   return precisions
+
 
 symbol_precisions = get_symbol_precisions()
 
+
 def get_usdt_pairs():
-    return list(symbol_precisions.keys())
+   return list(symbol_precisions.keys())
+
 
 def get_klines(symbol, interval, limit=210):
-    klines = client.klines(symbol=symbol, interval=interval, limit=limit)
-    df = pd.DataFrame(klines, columns=['timestamp', 'o', 'h', 'l', 'c', 'v', 'close_time', 'quote_asset_volume', 'num_trades', 'taker_buy_base_vol', 'taker_buy_quote_vol', 'ignore'])
-    df['c'] = df['c'].astype(float)
-    return df
+   klines = client.klines(symbol=symbol, interval=interval, limit=limit)
+   df = pd.DataFrame(klines, columns=['timestamp', 'o', 'h', 'l', 'c', 'v', 'close_time', 'quote_asset_volume', 'num_trades', 'taker_buy_base_vol', 'taker_buy_quote_vol', 'ignore'])
+   df['c'] = df['c'].astype(float)
+   return df
+
 
 def generate_indicators(df):
-    df['EMA20'] = EMAIndicator(df['c'], 20).ema_indicator()
-    df['EMA50'] = EMAIndicator(df['c'], 50).ema_indicator()
-    df['EMA200'] = EMAIndicator(df['c'], 200).ema_indicator()
-    df['RSI'] = RSIIndicator(df['c'], 14).rsi()
-    macd = MACD(df['c'], window_slow=26, window_fast=12, window_sign=9)
-    df['MACD'] = macd.macd()
-    df['Signal'] = macd.macd_signal()
-    df['Hist'] = macd.macd_diff()
-    return df
+   df['EMA20'] = EMAIndicator(df['c'], 20).ema_indicator()
+   df['EMA50'] = EMAIndicator(df['c'], 50).ema_indicator()
+   df['EMA200'] = EMAIndicator(df['c'], 200).ema_indicator()
+   df['RSI'] = RSIIndicator(df['c'], 14).rsi()
+   macd = MACD(df['c'], window_slow=26, window_fast=12, window_sign=9)
+   df['MACD'] = macd.macd()
+   df['Signal'] = macd.macd_signal()
+   df['Hist'] = macd.macd_diff()
+   return df
+
 
 def get_signal(df):
     latest = df.iloc[-1]
@@ -184,125 +205,148 @@ def get_signal(df):
     print(f"  → Indicators | EMA20: {ema20:.2f}, EMA50: {ema50:.2f}, EMA200: {ema200:.2f}, RSI: {rsi:.2f}, MACD: {macd:.4f}, Signal: {signal_line:.4f}, Hist: {hist:.4f}")
 
     attempts = [
-        lambda: (ema20 > ema50 and rsi < 40 and macd > signal_line and hist > 0, 'long', 'Perfect match for LONG'),
-        lambda: (ema20 < ema50 and rsi > 60 and macd < signal_line and hist < 0, 'short', 'Perfect match for SHORT'),
-        lambda: (ema20 > ema50 and rsi < 50, 'long', 'Close match for LONG'),
-        lambda: (ema20 < ema50 and rsi > 50, 'short', 'Close match for SHORT'),
-        lambda: (ema20 > ema50 and rsi < 50, 'long', 'Ignoring MACD - LONG'),
-        lambda: (ema20 < ema50 and rsi > 50, 'short', 'Ignoring MACD - SHORT'),
-        lambda: (ema20 > ema50, 'long', 'Ignoring RSI - LONG'),
-        lambda: (ema20 < ema50, 'short', 'Ignoring RSI - SHORT')
+        lambda: (ema20 > ema50 and rsi < 40 and macd > signal_line and hist > 0, 'long', 'Perfect match for LONG', 100),
+        lambda: (ema20 < ema50 and rsi > 60 and macd < signal_line and hist < 0, 'short', 'Perfect match for SHORT', 100),
+        lambda: (ema20 > ema50 and rsi < 50, 'long', 'Close match for LONG', 80),
+        lambda: (ema20 < ema50 and rsi > 50, 'short', 'Close match for SHORT', 80),
+        lambda: (ema20 > ema50 and rsi < 50, 'long', 'Ignoring MACD - LONG', 60),
+        lambda: (ema20 < ema50 and rsi > 50, 'short', 'Ignoring MACD - SHORT', 60),
+        lambda: (ema20 > ema50, 'long', 'Ignoring RSI - LONG', 40),
+        lambda: (ema20 < ema50, 'short', 'Ignoring RSI - SHORT', 40)
     ]
 
     for i, attempt in enumerate(attempts, start=1):
         print(f"    [ATTEMPT {i}] Evaluating...")
-        condition, direction, notes = attempt()
+        condition, direction, notes, score = attempt()
         if condition:
             if direction == 'long' and ema20 > ema200:
                 print(f"    [MATCH] {notes} ✅ Confirmed by EMA200")
-                return direction, f"[Attempt {i}] {notes} | Confirmed by EMA200"
+                return direction, f"[Attempt {i}] {notes} | Confirmed by EMA200", score
             elif direction == 'short' and ema20 < ema200:
                 print(f"    [MATCH] {notes} ✅ Confirmed by EMA200")
-                return direction, f"[Attempt {i}] {notes} | Confirmed by EMA200"
+                return direction, f"[Attempt {i}] {notes} | Confirmed by EMA200", score
             else:
                 print(f"    [SKIP] Direction valid but not aligned with EMA200 trend")
         else:
             print(f"    [FAIL] {notes} not satisfied")
-        time.sleep(1)
 
-    return None, None
+    return None, None, 0
+
+
 
 def place_trade(symbol, signal, entry_price, notes):
-    global trades_today
-    precision = symbol_precisions.get(symbol, 3)
-    raw_qty = (QUANTITY_USDT * LEVERAGE) / entry_price
-    qty = round(raw_qty, precision)
-    sl_price = entry_price - (RISK_PER_TRADE / qty) if signal == 'long' else entry_price + (RISK_PER_TRADE / qty)
-    tp_price = entry_price + (TP_USDT / qty) if signal == 'long' else entry_price - (TP_USDT / qty)
-    rr_ratio = round(TP_USDT / RISK_PER_TRADE, 2)
+   global trades_today
+   precision = symbol_precisions.get(symbol, 3)
+   raw_qty = (QUANTITY_USDT * LEVERAGE) / entry_price
+   qty = round(raw_qty, precision)
+   sl_price = entry_price - (RISK_PER_TRADE / qty) if signal == 'long' else entry_price + (RISK_PER_TRADE / qty)
+   tp_price = entry_price + (TP_USDT / qty) if signal == 'long' else entry_price - (TP_USDT / qty)
+   rr_ratio = round(TP_USDT / RISK_PER_TRADE, 2)
 
-    side = 'BUY' if signal == 'long' else 'SELL'
-    opposite = 'SELL' if signal == 'long' else 'BUY'
 
-    client.new_order(symbol=symbol, side=side, type='MARKET', quantity=qty)
-    client.new_order(
-        symbol=symbol,
-        side=opposite,
-        type='STOP_MARKET',
-        stopPrice=str(round(sl_price, 2)),
-        closePosition=True,
-        workingType='MARK_PRICE',
-        timeInForce='GTC'
-    )
-    client.new_order(
-        symbol=symbol,
-        side=opposite,
-        type='TAKE_PROFIT_MARKET',
-        stopPrice=str(round(tp_price, 2)),
-        closePosition=True,
-        workingType='MARK_PRICE',
-        timeInForce='GTC'
-    )
+   side = 'BUY' if signal == 'long' else 'SELL'
+   opposite = 'SELL' if signal == 'long' else 'BUY'
 
-    trades_today += 1
-    trade_log.append([
-        trades_today, symbol, signal, entry_price, round(sl_price, 2), round(tp_price, 2), qty, rr_ratio, notes
-    ])
 
-    print(f"[TRADE] Placed {symbol} | {signal.upper()} | Entry: {entry_price} | SL: {sl_price} | TP: {tp_price} | Qty: {qty} | Precision: {precision} | Trade Count: {trades_today}")
-    # 🚀 Send Telegram Alert
-    msg = (
-        f"📈 <b>TRADE EXECUTED</b>\n"
-        f"Pair: <code>{symbol}</code>\n"
-        f"Signal: <b>{signal.upper()}</b>\n"
-        f"Entry: ${entry_price:.2f}\n"
-        f"SL: ${sl_price:.2f}\n"
-        f"TP: ${tp_price:.2f}\n"
-        f"Qty: {qty}\n"
-        f"RR: {rr_ratio}\n"
-        f"Notes: {notes}"
-    )
-    send_telegram_message(msg)
+   client.new_order(symbol=symbol, side=side, type='MARKET', quantity=qty)
+   client.new_order(
+       symbol=symbol,
+       side=opposite,
+       type='STOP_MARKET',
+       stopPrice=str(round(sl_price, 2)),
+       closePosition=True,
+       workingType='MARK_PRICE',
+       timeInForce='GTC'
+   )
+   client.new_order(
+       symbol=symbol,
+       side=opposite,
+       type='TAKE_PROFIT_MARKET',
+       stopPrice=str(round(tp_price, 2)),
+       closePosition=True,
+       workingType='MARK_PRICE',
+       timeInForce='GTC'
+   )
+
+
+   trades_today += 1
+   trade_log.append([
+       trades_today, symbol, signal, entry_price, round(sl_price, 2), round(tp_price, 2), qty, rr_ratio, notes
+   ])
+
+
+   print(f"[TRADE] Placed {symbol} | {signal.upper()} | Entry: {entry_price} | SL: {sl_price} | TP: {tp_price} | Qty: {qty} | Precision: {precision} | Trade Count: {trades_today}")
+   # 🚀 Send Telegram Alert
+   msg = (
+       f"📈 <b>TRADE EXECUTED</b>\n"
+       f"Pair: <code>{symbol}</code>\n"
+       f"Signal: <b>{signal.upper()}</b>\n"
+       f"Entry: ${entry_price:.2f}\n"
+       f"SL: ${sl_price:.2f}\n"
+       f"TP: ${tp_price:.2f}\n"
+       f"Qty: {qty}\n"
+       f"RR: {rr_ratio}\n"
+       f"Notes: {notes}"
+   )
+   send_telegram_message(msg)
+
+potential_pair = []
+top_signals = []
 
 
 # ==== MAIN LOOP ====
 while True:
     try:
+         if trades_today >= MAX_TRADES_PER_DAY:
+              print("[END] Max trades reached today. Exiting bot.")
+              break
 
-        if trades_today >= MAX_TRADES_PER_DAY:
-            print("[END] Max trades reached today. Exiting bot.")
-            break
+         found_signal = False
+         potential_pair = []  # Reset potential pairs each cycle
+         usdt_pairs = get_usdt_pairs()
+         
+         for symbol in usdt_pairs:
+              if trades_today >= MAX_TRADES_PER_DAY:
+                    break
+              try:
+                    print(f"\n[SCANNING] {symbol}")
+                    df = get_klines(symbol, INTERVAL)
+                    df = generate_indicators(df)
+                    signal, notes, score = get_signal(df)
 
-        found_signal = False
-        usdt_pairs = get_usdt_pairs()
-        for symbol in usdt_pairs:
-            if trades_today >= MAX_TRADES_PER_DAY:
-                break
-            try:
-                print(f"\n[SCANNING] {symbol}")
-                df = get_klines(symbol, INTERVAL)
-                df = generate_indicators(df)
-                signal, notes = get_signal(df)
+                    if signal:
+                         mark = client.mark_price(symbol=symbol)
+                         price = float(mark['markPrice'])
+                         print(f"[SIGNAL FOUND] {symbol} | Signal: {signal} | Price: {price} | Score: {score} | Notes: {notes}")
+                         potential_pair.append({
+                          'symbol': symbol,
+                          'signal': signal,
+                          'price': price,
+                          'notes': notes,
+                          'score': score
+                          })
+                         
+              except Exception as e:
+                    print(f"[ERROR] {symbol}: {e}")
 
-                if signal:
-                    mark = client.mark_price(symbol=symbol)
-                    price = float(mark['markPrice'])
-                    place_trade(symbol, signal, price, notes)
-                    found_signal = True
-                time.sleep(0.5)
+         # Process top signals after scanning all pairs
+         top_signals = sorted(potential_pair, key=lambda x: x['score'], reverse=True)[:6]
+         for signal_data in top_signals:
+                place_trade(signal_data['symbol'], signal_data['signal'], signal_data['price'], signal_data['notes'])
+                time.sleep(1)
+                found_signal = True
 
-            except Exception as e:
-                print(f"[ERROR] {symbol}: {e}")
-
-        if not found_signal:
-            print("[SUMMARY] No valid pairs found in this cycle.")
+         if not found_signal:
+              print("[SUMMARY] No valid pairs found in this cycle.")
 
     except Exception as e:
-        print(f"[FATAL] {e}")
+         print(f"[FATAL] {e}")
 
-    print("[SLEEP] Waiting 5 minutes before next scan...")
-    
+    print("[FINISH] Cycle completed.")
+
 print("[END] Bot execution completed.")
 send_telegram_message("Bot execution completed.")
 
-
+print("\n[FINAL TOP SIGNALS]")
+for i, s in enumerate(top_signals, 1):
+     print(f"  {i}. {s['symbol']} | Signal: {s['signal']} | Price: {s['price']} | Score: {s['score']} | Notes: {s['notes']}")

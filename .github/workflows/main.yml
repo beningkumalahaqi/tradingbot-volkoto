@@ -29,6 +29,12 @@ jobs:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         TESTNET: ${{ secrets.TESTNET }}
+        QUANTITY_USDT: ${{ secrets.QUANTITY_USDT }}
+        RISK_PER_TRADE: ${{ secrets.RISK_PER_TRADE }}
+        TP_USDT: ${{ secrets.TP_USDT }}
+        LEVERAGE: ${{ secrets.LEVERAGE }}
+        MAX_TRADE_PER_DAY: ${{ secrets.MAX_TRADE_PER_DAY }}
+
 
     - name: Send Telegram notification on success
       if: success()
