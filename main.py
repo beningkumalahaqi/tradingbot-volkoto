@@ -142,7 +142,7 @@ print(f"[START] Starting bot...")
 get_yesterday_pnl(API_KEY, API_SECRET, TESTNET)
 BASE_URL = 'https://testnet.binancefuture.com' if TESTNET else 'https://fapi.binance.com'
 client = UMFutures(key=API_KEY, secret=API_SECRET, base_url=BASE_URL)
-trades_today = 0
+trades_today = max(0, min(0, MAX_TRADES_PER_DAY))
 current_day = time.strftime('%Y-%m-%d')
 trade_log = []
 send_telegram_message(f"Bot started on {current_day}. Monitoring market...")
@@ -520,8 +520,14 @@ def place_trade(symbol, signal, entry_price, qty, notes):
                             )
                         except ClientError as e:
                             # Cancel the market order if SL fails
-                            client.cancel_open_orders(symbol=symbol)
-                            print(f"[INFO] SL order CANCELED for {symbol}")
+                            client.new_order(
+                                    symbol=symbol,
+                                    side=opposite,
+                                    type='MARKET',
+                                    reduceOnly=True,  # This ensures the order only reduces/closes position
+                                    quantity=qty
+                            )
+                            print(f"[INFO] Order CANCELED for {symbol}")
 
                             if "already exists" in str(e.error_message).lower():
                                 print(f"[INFO] Stop-Loss order already exists for {symbol}")
@@ -543,8 +549,14 @@ def place_trade(symbol, signal, entry_price, qty, notes):
                             )
                         except ClientError as e:
                             # Cancel the market order if TP fails
-                            client.cancel_open_orders(symbol=symbol)
-                            print(f"[INFO] TP order CANCELED for {symbol}")
+                            client.new_order(
+                                    symbol=symbol,
+                                    side=opposite,
+                                    type='MARKET',
+                                    reduceOnly=True,  # This ensures the order only reduces/closes position
+                                    quantity=qty
+                            )
+                            print(f"[INFO] Order CANCELED for {symbol}")
                             
                             if "already exists" in str(e.error_message).lower():
                                 print(f"[INFO] Take-Profit order already exists for {symbol}")
@@ -572,27 +584,42 @@ def place_trade(symbol, signal, entry_price, qty, notes):
                         )
                         send_telegram_message(msg)
                         return True
+                    
                 except ClientError as e:
+                    # Cancel the market order if any error occurs      
                     print(f"[ERROR] Real order failed for {symbol}: {e.error_message}")
+                    client.new_order(
+                        symbol=symbol,
+                        side=opposite,
+                        type='MARKET',
+                        reduceOnly=True,  # This ensures the order only reduces/closes position
+                        quantity=qty
+                        )
+                    trades_today -= 1
+                    print(f"[INFO] Order CANCELED for {symbol}")
+
                     if "executed" not in str(e.error_message).lower():
                         excluded_symbols.append(symbol)
                     return False
             else:
+                # Cancel the market order if any error occurs
                 print(f"[ERROR] Test failed for {symbol}. Not placing real trade.")
                 send_telegram_message(f"❌ Test failed for {symbol}. Not placing real trade.")
                 excluded_symbols.append(symbol)
                 return False  # Skip trade if test failed
         except ClientError as e:
+            # Cancel the market order if any error occurs
             print(f"[ERROR] Trade Error for {symbol}: {e.error_message}")
             send_telegram_message(f"❌ Trade Error for {symbol}: {e.error_message}")
             excluded_symbols.append(symbol)  # Add to excluded symbols
             return False  # Trade is invalid
     else:
+        # Cancel the market order if any error occurs
         error_msg = f"Invalid quantity calculated for {symbol}: {qty}"
         print(f"[ERROR] Trade Error for  {error_msg}")
         send_telegram_message(f"❌ Trade Error: {error_msg}")
         excluded_symbols.append(symbol)  # Add to excluded symbols
-        raise ValueError(error_msg)  # Raise an error for invalid quantity
+        return False  # Raise an error for invalid quantity
 
 potential_pair = [] #  List to track potential pairs
 top_signals = [] # List to track top signals
